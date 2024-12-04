@@ -1,0 +1,586 @@
+# Load packages
+library(dplyr)
+library(readr)
+library(ggpubr)
+library(viridis)
+library(broom)
+library(texreg)
+library(ggplot2)
+
+# Import data
+bg = read_csv("New_Data(New Data).csv") %>%
+  mutate(BENE_GEO_DESC = factor(BENE_GEO_DESC))
+
+bg %>% head(3) 
+
+bg %>% head(20) 
+
+
+##### Readmission Rates: California vs Texas #####
+# Load packages
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(broom)
+library(texreg)
+
+# Import data
+bg <- read_csv("New_Data(New Data).csv") %>%
+  mutate(BENE_GEO_DESC = factor(BENE_GEO_DESC))
+
+# Filter data for California and Texas
+bg_filtered <- bg %>%
+  filter(BENE_GEO_DESC %in% c("CA", "TX"))
+
+# Create a new variable for readmission rate per beneficiary
+bg_filtered <- bg_filtered %>%
+  mutate(READMISSION_RATE = ACUTE_HOSP_READMSN_CNT / BENES_TOTAL_CNT)
+
+# Summary statistics for California and Texas
+summary_stats <- bg_filtered %>%
+  group_by(BENE_GEO_DESC) %>%
+  summarize(
+    Mean_Readmission_Rate = mean(READMISSION_RATE, na.rm = TRUE),
+    Mean_ER_Visits = mean(BENES_ER_VISITS_CNT, na.rm = TRUE),
+    Mean_Hospital_Payment = mean(IP_MDCR_PYMT_PER_USER, na.rm = TRUE)
+  )
+
+print(summary_stats)
+
+# Visualize readmission rates
+ggplot(bg_filtered, aes(x = BENE_GEO_DESC, y = READMISSION_RATE, fill = BENE_GEO_DESC)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(title = "Readmission Rates: California vs Texas",
+       x = "State",
+       y = "Readmission Rate") +
+  theme_minimal()
+
+# Build linear regression models
+model1 <- lm(READMISSION_RATE ~ BENE_GEO_DESC, data = bg_filtered)
+model2 <- lm(READMISSION_RATE ~ BENE_GEO_DESC + IP_MDCR_PYMT_PER_USER + BENES_ER_VISITS_CNT, data = bg_filtered)
+
+# Summarize the models
+summary(model1)
+summary(model2)
+
+# Compare models
+texreg::screenreg(list(model1, model2))
+
+# Identify key contributing factors
+model_factors <- lm(READMISSION_RATE ~ IP_MDCR_PYMT_PER_USER + BENES_ER_VISITS_CNT + OP_MDCR_PYMT_PER_USER + IMGNG_MDCR_PYMT_PER_USER, data = bg_filtered)
+tidy(model_factors, conf.int = TRUE)
+
+
+##### Comparison of Key Factors Betw CA and TX #####
+# Load necessary packages
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(tidyr)
+
+# Import the dataset
+bg <- read_csv("New_Data(New Data).csv") %>%
+  mutate(BENE_GEO_DESC = factor(BENE_GEO_DESC))
+
+# Filter data for California and Texas
+bg_filtered <- bg %>%
+  filter(BENE_GEO_DESC %in% c("CA", "TX"))
+
+# Reshape data for five selected factors
+bg_long <- bg_filtered %>%
+  dplyr::select(
+    BENE_GEO_DESC,
+    BENES_TOTAL_CNT,
+    BENES_ER_VISITS_CNT,
+    IMGNG_MDCR_PYMT_PER_USER,
+    IP_MDCR_PYMT_PER_USER,
+    OP_MDCR_PYMT_PER_USER
+  ) %>%
+  rename(
+    Hospitalizations = BENES_TOTAL_CNT,
+    ER_Visits = BENES_ER_VISITS_CNT,
+    Imaging_Payment = IMGNG_MDCR_PYMT_PER_USER,
+    Inpatient_Payment = IP_MDCR_PYMT_PER_USER,
+    Outpatient_Payment = OP_MDCR_PYMT_PER_USER
+  ) %>%
+  pivot_longer(
+    cols = -BENE_GEO_DESC,
+    names_to = "Factor",
+    values_to = "Quantity"
+  )
+
+# Create the comparison plot
+ggplot(bg_long, aes(x = Factor, y = Quantity, color = BENE_GEO_DESC)) +
+  geom_jitter(alpha = 0.6, width = 0.2) +
+  geom_boxplot(aes(fill = BENE_GEO_DESC), alpha = 0.3, outlier.shape = NA) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "Comparison of Key Factors Between California and Texas",
+    x = "Factor",
+    y = "Quantity",
+    color = "State",
+    fill = "State"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+##### Financial Factors Comp CA and TX #####
+
+# Load necessary packages
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(tidyr)
+
+# Import the dataset
+bg <- read_csv("New_Data(New Data).csv") %>%
+  mutate(BENE_GEO_DESC = factor(BENE_GEO_DESC))
+
+# Filter data for California and Texas
+bg_filtered <- bg %>%
+  filter(BENE_GEO_DESC %in% c("CA", "TX"))
+
+# Reshape data for financial factors
+financial_factors <- bg_filtered %>%
+  dplyr::select(
+    BENE_GEO_DESC,
+    IP_MDCR_PYMT_PER_USER,    # Inpatient payment
+    OP_MDCR_PYMT_PER_USER,    # Outpatient payment
+    IMGNG_MDCR_PYMT_PER_USER  # Imaging payment
+  ) %>%
+  rename(
+    Inpatient_Payment = IP_MDCR_PYMT_PER_USER,
+    Outpatient_Payment = OP_MDCR_PYMT_PER_USER,
+    Imaging_Payment = IMGNG_MDCR_PYMT_PER_USER
+  ) %>%
+  pivot_longer(
+    cols = -BENE_GEO_DESC,
+    names_to = "Factor",
+    values_to = "Reimbursement"
+  )
+
+# Create the comparison plot for financial factors
+ggplot(financial_factors, aes(x = Factor, y = Reimbursement, color = BENE_GEO_DESC)) +
+  geom_jitter(alpha = 0.6, width = 0.2) +
+  geom_boxplot(aes(fill = BENE_GEO_DESC), alpha = 0.3, outlier.shape = NA) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "Financial Factors Comparison: California vs Texas",
+    x = "Factor",
+    y = "Reimbursement Amount (USD)",
+    color = "State",
+    fill = "State"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+##### Imaging Payment Per User: CA vs TX #####
+# Visualization for Inpatient Payment
+ggplot(bg_filtered, aes(x = BENE_GEO_DESC, y = IP_MDCR_PYMT_PER_USER, fill = BENE_GEO_DESC)) +
+  geom_jitter(color = "black", alpha = 0.6, width = 0.2) +
+  geom_boxplot(alpha = 0.3, outlier.shape = NA) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "Inpatient Payment Per User: California vs Texas",
+    x = "State",
+    y = "Inpatient Payment (USD)",
+    fill = "State"
+  ) +
+  theme_minimal()
+
+# Visualization for Outpatient Payment
+ggplot(bg_filtered, aes(x = BENE_GEO_DESC, y = OP_MDCR_PYMT_PER_USER, fill = BENE_GEO_DESC)) +
+  geom_jitter(color = "black", alpha = 0.6, width = 0.2) +
+  geom_boxplot(alpha = 0.3, outlier.shape = NA) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "Outpatient Payment Per User: California vs Texas",
+    x = "State",
+    y = "Outpatient Payment (USD)",
+    fill = "State"
+  ) +
+  theme_minimal()
+
+
+# Visualization for Imaging Payment
+ggplot(bg_filtered, aes(x = BENE_GEO_DESC, y = IMGNG_MDCR_PYMT_PER_USER, fill = BENE_GEO_DESC)) +
+  geom_jitter(color = "black", alpha = 0.6, width = 0.2) +
+  geom_boxplot(alpha = 0.3, outlier.shape = NA) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "Imaging Payment Per User: California vs Texas",
+    x = "State",
+    y = "Imaging Payment (USD)",
+    fill = "State"
+  ) +
+  theme_minimal()
+
+
+##### Comparison of Readmission Rate with Test and Imaging Payments #####
+# Calculate readmission rate in the filtered dataset
+bg_filtered <- bg_filtered %>%
+  mutate(
+    READMISSION_RATE = ACUTE_HOSP_READMSN_CNT / BENES_TOTAL_CNT
+  )
+
+colnames(bg_filtered)
+
+# Check column names to confirm the exact names
+print(colnames(bg_filtered))
+
+# Replace the column name with the correct one if necessary
+bg_filtered <- bg_filtered %>%
+  mutate(
+    READMISSION_RATE = ACUTE_HOSP_READMSN_CNT / BENES_TOTAL_CNT
+  )
+
+# Reshape data for Test Payments and Imaging Payments
+readmission_factors <- bg_filtered %>%
+  dplyr::select(
+    BENE_GEO_DESC,
+    READMISSION_RATE,
+    TESTS_MDCR_PYMT_PER_USER,
+    IMGNG_MDCR_PYMT_PER_USER # Replace this with the correct column name if it differs
+  ) %>%
+  rename(
+    Test_Payment = TESTS_MDCR_PYMT_PER_USER,
+    Imaging_Payment = IMGNG_MDCR_PYMT_PER_USER # Replace this with the correct column name if it differs
+  ) %>%
+  pivot_longer(
+    cols = c(Test_Payment, Imaging_Payment),
+    names_to = "Factor",
+    values_to = "Payment"
+  )
+
+# Create the visualization
+ggplot(readmission_factors, aes(x = Payment, y = READMISSION_RATE, color = BENE_GEO_DESC)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", se = TRUE, aes(fill = BENE_GEO_DESC), alpha = 0.2) +
+  facet_wrap(~ Factor, scales = "free_x") +
+  labs(
+    title = "Comparison of Readmission Rate with Test and Imaging Payments",
+    x = "Payment (USD)",
+    y = "Readmission Rate",
+    color = "State",
+    fill = "State"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+             
+
+
+##### Comparison of Readmission Rate and PQI Factors (Per 100,000) CA vs TX #####
+# Load necessary packages
+library(dplyr)
+library(readr)
+library(tidyr)
+library(ggplot2)
+
+# Import the dataset
+bg <- read_csv("New_Data(New Data).csv") %>%
+  mutate(
+    BENE_GEO_DESC = factor(BENE_GEO_DESC) # Ensure state is a factor
+  )
+
+# Filter data for California and Texas
+bg_filtered <- bg %>%
+  filter(BENE_GEO_DESC %in% c("CA", "TX")) %>%
+  mutate(
+    # Adjust readmission rate and PQI factors to be per 100,000 beneficiaries
+    READMISSION_RATE_100K = (ACUTE_HOSP_READMSN_CNT / BENES_TOTAL_CNT) * 100000,
+    PQI03_DBTS_100K = PQI03_DBTS_AGE_65_74,
+    PQI05_COPD_ASTHMA_100K = PQI05_COPD_ASTHMA_AGE_65_74,
+    PQI07_HYPRTNSN_100K = PQI07_HYPRTNSN_AGE_65_74,
+    PQI08_CHF_100K = PQI08_CHF_AGE_65_74,
+    PQI11_BCTRL_PNA_100K = PQI11_BCTRL_PNA_AGE_65_74,
+    PQI12_UTI_100K = PQI12_UTI_AGE_65_74
+  )
+
+# Reshape data to compare PQI factors
+pqi_factors <- bg_filtered %>%
+  dplyr::select(
+    BENE_GEO_DESC,
+    READMISSION_RATE_100K,
+    PQI03_DBTS_100K,
+    PQI05_COPD_ASTHMA_100K,
+    PQI07_HYPRTNSN_100K,
+    PQI08_CHF_100K,
+    PQI11_BCTRL_PNA_100K,
+    PQI12_UTI_100K
+  ) %>%
+  pivot_longer(
+    cols = starts_with("PQI"),
+    names_to = "PQI_Factor",
+    values_to = "Count"
+  )
+
+# Create the visualization
+ggplot(pqi_factors, aes(x = Count, y = READMISSION_RATE_100K, color = BENE_GEO_DESC)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", se = TRUE, aes(fill = BENE_GEO_DESC), alpha = 0.2) +
+  facet_wrap(~ PQI_Factor, scales = "free_x") +
+  labs(
+    title = "Comparison of Readmission Rate and PQI Factors (Per 100,000): California vs Texas",
+    x = "PQI Factor Count (Per 100,000 Beneficiaries)",
+    y = "Readmission Rate (Per 100,000 Beneficiaries)",
+    color = "State",
+    fill = "State"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+##### Comparison of Financial Factors Initial #####
+# Load necessary packages
+library(dplyr)
+library(readr)
+library(tidyr)
+library(ggplot2)
+
+# Import the dataset
+bg <- read_csv("New_Data(New Data).csv") %>%
+  mutate(BENE_GEO_DESC = factor(BENE_GEO_DESC)) # Ensure state is a factor
+
+# Filter data for California and Texas
+financial_data <- bg %>%
+  filter(BENE_GEO_DESC %in% c("CA", "TX")) %>%
+  dplyr::select(
+    BENE_GEO_DESC,
+    IP_MDCR_PYMT_PER_USER,   # Inpatient payment
+    OP_MDCR_PYMT_PER_USER,   # Outpatient payment
+    IMGNG_MDCR_PYMT_PER_USER # Imaging payment
+  ) %>%
+  rename(
+    Inpatient_Payment = IP_MDCR_PYMT_PER_USER,
+    Outpatient_Payment = OP_MDCR_PYMT_PER_USER,
+    Imaging_Payment = IMGNG_MDCR_PYMT_PER_USER
+  ) %>%
+  pivot_longer(
+    cols = -BENE_GEO_DESC,
+    names_to = "Payment_Type",
+    values_to = "Amount"
+  )
+
+# Summarize the data to calculate mean values
+financial_summary <- financial_data %>%
+  group_by(BENE_GEO_DESC, Payment_Type) %>%
+  summarize(Mean_Amount = mean(Amount, na.rm = TRUE), .groups = "drop")
+
+# Create the grouped bar chart
+ggplot(financial_summary, aes(x = Payment_Type, y = Mean_Amount, fill = BENE_GEO_DESC)) +
+  geom_bar(stat = "identity", position = "dodge", alpha = 0.8) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "Comparison of Financial Factors: California vs Texas",
+    x = "Payment Type",
+    y = "Average Payment Amount (USD)",
+    fill = "State"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+##### More date : Comparison of Financial Factors CA vs TX #####
+# Load necessary packages
+library(dplyr)
+library(readr)
+library(tidyr)
+library(ggplot2)
+
+# Import the dataset with correct column names
+bg <- read_csv("New_Data(New Data).csv") %>%
+  mutate(BENE_GEO_DESC = factor(BENE_GEO_DESC)) # Ensure state is a factor
+
+# Filter data for California and Texas and select specified financial factors
+financial_data <- bg %>%
+  filter(BENE_GEO_DESC %in% c("CA", "TX")) %>%
+  dplyr::select(
+    BENE_GEO_DESC,
+    TESTS_MDCR_PYMT_PER_USER,   # Tests payment
+    IMGNG_MDCR_PYMT_PER_USER,   # Imaging payment
+    EM_MDCR_PYMT_PER_USER,      # Emergency medicine payment
+    PRCDRS_MDCR_PYMT_PER_USER,  # Procedure payment
+    TRTMNTS_MDCR_PYMT_PER_USER, # Treatment payment
+    OP_MDCR_PYMT_PER_USER       # Outpatient payment
+  ) %>%
+  rename(
+    Tests_Payment = TESTS_MDCR_PYMT_PER_USER,
+    Imaging_Payment = IMGNG_MDCR_PYMT_PER_USER,
+    Emergency_Medicine_Payment = EM_MDCR_PYMT_PER_USER,
+    Procedure_Payment = PRCDRS_MDCR_PYMT_PER_USER,
+    Treatment_Payment = TRTMNTS_MDCR_PYMT_PER_USER,
+    Outpatient_Payment = OP_MDCR_PYMT_PER_USER
+  ) %>%
+  pivot_longer(
+    cols = -BENE_GEO_DESC,
+    names_to = "Financial_Factor",
+    values_to = "Amount"
+  )
+
+# Summarize the data to calculate mean values
+financial_summary <- financial_data %>%
+  group_by(BENE_GEO_DESC, Financial_Factor) %>%
+  summarize(Mean_Amount = mean(Amount, na.rm = TRUE), .groups = "drop")
+
+# Create the grouped bar chart
+ggplot(financial_summary, aes(x = Financial_Factor, y = Mean_Amount, fill = BENE_GEO_DESC)) +
+  geom_bar(stat = "identity", position = "dodge", alpha = 0.8) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "Comparison of Financial Factors: California vs Texas",
+    subtitle = "Mean Payment Per User by Financial Category",
+    x = "Financial Factor",
+    y = "Mean Amount (USD)",
+    fill = "State"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+
+##### Final Financial Factor Comparison #####
+# Load necessary packages
+library(dplyr)
+library(readr)
+library(tidyr)
+library(ggplot2)
+
+# Import the dataset with correct column names
+bg <- read_csv("New_Data(New Data).csv") %>%
+  mutate(BENE_GEO_DESC = factor(BENE_GEO_DESC)) # Ensure state is a factor
+
+# Filter data for California and Texas and select specified financial factors
+financial_data <- bg %>%
+  filter(BENE_GEO_DESC %in% c("CA", "TX")) %>%
+  dplyr::select(
+    BENE_GEO_DESC,
+    TESTS_MDCR_PYMT_PER_USER,   # Tests payment
+    IMGNG_MDCR_PYMT_PER_USER,   # Imaging payment
+    EM_MDCR_PYMT_PER_USER,      # Emergency medicine payment
+    PRCDRS_MDCR_PYMT_PER_USER,  # Procedure payment
+    TRTMNTS_MDCR_PYMT_PER_USER, # Treatment payment
+    OP_MDCR_PYMT_PER_USER       # Outpatient payment
+  ) %>%
+  rename(
+    Tests_Payment = TESTS_MDCR_PYMT_PER_USER,
+    Imaging_Payment = IMGNG_MDCR_PYMT_PER_USER,
+    Emergency_Medicine_Payment = EM_MDCR_PYMT_PER_USER,
+    Procedure_Payment = PRCDRS_MDCR_PYMT_PER_USER,
+    Treatment_Payment = TRTMNTS_MDCR_PYMT_PER_USER,
+    Outpatient_Payment = OP_MDCR_PYMT_PER_USER
+  ) %>%
+  pivot_longer(
+    cols = -BENE_GEO_DESC,
+    names_to = "Financial_Factor",
+    values_to = "Amount"
+  )
+
+# Summarize the data to calculate mean and standard deviation
+financial_summary <- financial_data %>%
+  group_by(BENE_GEO_DESC, Financial_Factor) %>%
+  summarize(
+    Mean_Amount = mean(Amount, na.rm = TRUE),
+    SD = sd(Amount, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Create the enhanced bar chart
+ggplot(financial_summary, aes(x = Financial_Factor, y = Mean_Amount, fill = Mean_Amount)) +
+  geom_bar(stat = "identity", position = "dodge", alpha = 0.8) +
+  geom_errorbar(aes(ymin = Mean_Amount - SD, ymax = Mean_Amount + SD),
+                width = 0.2, position = position_dodge(0.9)) +
+  geom_text(aes(label = scales::comma(round(Mean_Amount, 2))),
+            position = position_dodge(0.9), vjust = -0.5, size = 3.5, color = "black") +
+  facet_wrap(~ BENE_GEO_DESC, ncol = 1) +
+  scale_fill_gradient(low = "steelblue", high = "darkblue") +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "Comparison of Financial Factors: California vs Texas",
+    subtitle = "Mean Payment Per User with Standard Deviations",
+    x = "Financial Factor",
+    y = "Mean Amount (USD)",
+    fill = "Mean Payment"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 16),
+    plot.subtitle = element_text(hjust = 0.5, size = 12),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.background = element_rect(fill = "lightgray", color = "black"),
+    strip.text = element_text(face = "bold", size = 12)
+  )
+
+
+
+##### Linking Financial Factors to Readmission Rates, just for self #####
+# Load necessary packages
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(tidyr)
+library(GGally)
+# Install GGally package
+install.packages("GGally")
+
+# Load the package
+library(GGally)
+
+
+# Import the dataset with correct column names
+bg <- read_csv("New_Data(New Data).csv") %>%
+  mutate(
+    BENE_GEO_DESC = factor(BENE_GEO_DESC), # Ensure state is a factor
+    READMISSION_RATE = ACUTE_HOSP_READMSN_CNT / BENES_TOTAL_CNT * 100000 # Readmission rate per 100,000 beneficiaries
+  )
+
+# Filter data for California and Texas and select relevant variables
+financial_readmission_data <- bg %>%
+  filter(BENE_GEO_DESC %in% c("CA", "TX")) %>%
+  dplyr::select(
+    BENE_GEO_DESC,
+    READMISSION_RATE,
+    TESTS_MDCR_PYMT_PER_USER,   # Tests payment
+    IMGNG_MDCR_PYMT_PER_USER,   # Imaging payment
+    EM_MDCR_PYMT_PER_USER,      # Emergency medicine payment
+    PRCDRS_MDCR_PYMT_PER_USER,  # Procedure payment
+    TRTMNTS_MDCR_PYMT_PER_USER, # Treatment payment
+    OP_MDCR_PYMT_PER_USER       # Outpatient payment
+  ) %>%
+  rename(
+    Tests_Payment = TESTS_MDCR_PYMT_PER_USER,
+    Imaging_Payment = IMGNG_MDCR_PYMT_PER_USER,
+    Emergency_Medicine_Payment = EM_MDCR_PYMT_PER_USER,
+    Procedure_Payment = PRCDRS_MDCR_PYMT_PER_USER,
+    Treatment_Payment = TRTMNTS_MDCR_PYMT_PER_USER,
+    Outpatient_Payment = OP_MDCR_PYMT_PER_USER
+  )
+
+# Pair plot to visualize relationships between financial factors and readmission rates
+ggpairs(
+  financial_readmission_data,
+  columns = 2:8, # Include readmission rate and financial factors
+  aes(color = BENE_GEO_DESC, alpha = 0.7),
+  upper = list(continuous = wrap("cor", size = 4)),
+  lower = list(continuous = wrap("smooth", method = "lm", se = TRUE, size = 0.5)),
+  diag = list(continuous = wrap("densityDiag", alpha = 0.5))
+) +
+  labs(
+    title = "Linking Financial Factors to Readmission Rates",
+    subtitle = "Scatter Plot Matrix with Regression Lines and Correlations",
+    color = "State"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 16),
+    plot.subtitle = element_text(hjust = 0.5, size = 12),
+    legend.position = "bottom"
+  )
+
+
